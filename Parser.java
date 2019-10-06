@@ -61,7 +61,6 @@ public class Parser {
     //grabs the date and then checks if it's updated
     public void update(String s, File f) {
         try {
-            String link = "/Users/andrewboyce/IdeaProjects/csc365/src" + s.substring(29) + ".txt";
             HashTable temp = new HashTable(8);
             Document doc = Jsoup.parse(f, "UTF-8", s);
             String page = doc.text().toLowerCase();
