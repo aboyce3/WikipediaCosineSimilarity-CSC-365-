@@ -1,10 +1,7 @@
 import org.jsoup.Jsoup;
-
 import javax.swing.*;
-import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
 
 public class GUI {
 
@@ -21,33 +18,32 @@ public class GUI {
         j.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         j.setResizable(false);
         //Listener for the enter button
-        enter.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                if (!input.getText().isEmpty()) {
-                    try {
-                        //resets the results after enter is clicked
-                        results.setText("");
-                        ArrayList<Double> ar = new ArrayList();
-                        WikiPage page = p.parseInput(Jsoup.connect(input.getText()));
-                        for(WikiPage wiki : p.table) wiki.cosine = wiki.cosineSimilarity(page.words, wiki.words);
-                        for(WikiPage wiki : p.table) ar.add(wiki.cosine);
-                        Collections.sort(ar);
-                        Collections.reverse(ar);
-                        //Sorts the cosine similarities in an ArrayList, then looks up the page with the same score
-                        // and appends to the results
-                        for(int i = 0; i < 5; i++){
-                            for(WikiPage wikiPage : p.table){
-                            if(wikiPage.cosine == ar.get(i)) results.append((i+1) + ".) " +wikiPage.URL + "\n" + "Score: " + wikiPage.cosine + "\n");
-                            }
+        enter.addActionListener(e -> {
+            if (!input.getText().isEmpty()) {
+                try {
+                    //resets the results after enter is clicked
+                    results.setText("");
+                    ArrayList<Double> ar = new ArrayList();
+                    WikiPage page = p.parseInput(Jsoup.connect(input.getText()));
+                    for (WikiPage wiki : p.table) wiki.cosine = wiki.cosineSimilarity(page.words, wiki.words);
+                    for (WikiPage wiki : p.table) ar.add(wiki.cosine);
+                    Collections.sort(ar);
+                    Collections.reverse(ar);
+                    //Sorts the cosine similarities in an ArrayList, then looks up the page with the same score
+                    // and appends to the results
+                    for (int i = 0; i < 5; i++) {
+                        for (WikiPage wikiPage : p.table) {
+                            if (wikiPage.cosine == ar.get(i))
+                                results.append((i + 1) + ".) " + wikiPage.URL + "\n" + "Score: " + wikiPage.cosine + "\n");
                         }
-
-                    } catch (Exception er) {
-                        er.printStackTrace();
                     }
+
+                } catch (Exception er) {
+                    results.setText("");
+                    results.append("Invalid Link");
                 }
             }
         });
-        j.setBackground(Color.BLUE);
         author.setBounds(125, 460, 400, 20);
         results.setBounds(0, 60, 400, 400);
         label.setBounds(0, 0, 400, 20);

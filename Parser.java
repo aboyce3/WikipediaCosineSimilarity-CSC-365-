@@ -26,14 +26,14 @@ public class Parser {
             e.printStackTrace();
         }
         links = document.select("a[href]");
-        fileCount = new File("/Users/andrewboyce/IdeaProjects/csc365/src").list().length;
+        fileCount = new File(System.getProperty("user.dir")).list().length;
         table = new ArrayList();
     }
 
     //if there are 24 files (txt files and java code) then check if the websites are updated or create files based off
     // of a wikipedia link
     public void initialize() {
-        File[] f = new File("/Users/andrewboyce/IdeaProjects/csc365/src").listFiles();
+        File[] f = new File(System.getProperty("user.dir")).listFiles();
         if (fileCount >= 24) {
             Arrays.stream(f)
                     .filter(e -> e.getName().contains(".txt"))
@@ -58,6 +58,7 @@ public class Parser {
                     .forEach(e -> parse(Jsoup.connect(e.attr("abs:href")), e.attr("abs:href")));
         }
     }
+
     //grabs the date and then checks if it's updated
     public void update(String s, File f) {
         try {
@@ -66,7 +67,7 @@ public class Parser {
             String page = doc.text().toLowerCase();
             String[] arr = page.split("\\W+");
             Arrays.sort(arr);
-            Arrays.stream(arr).forEach(e -> temp.put(e, e));
+            Arrays.stream(arr).forEach(e -> temp.add(e, e));
             WikiPage webPage = new WikiPage(s);
             webPage.setTable(temp);
             String lastMod = doc.body().text().substring(doc.body().text().indexOf("This page was last edited on "), doc.body().text().indexOf("(UTC)."));
@@ -153,7 +154,7 @@ public class Parser {
     //Parses the web page and adds to an ArrayList of web pages
     private void parse(Connection website, String s) {
         try {
-            String link = "/Users/andrewboyce/IdeaProjects/csc365/src/" + s.substring(29) + ".txt";
+            String link = System.getProperty("user.dir") + s.substring(29) + ".txt";
             File f = new File(link);
             HashTable temp = new HashTable(8);
             Document doc = Jsoup.parse(website.get().html());
@@ -233,7 +234,7 @@ public class Parser {
             Date d1 = sdf.parse(parseDate);
             String[] arr = page.split("\\W+");
             Arrays.sort(arr);
-            Arrays.stream(arr).forEach(e -> temp.put(e, e));
+            Arrays.stream(arr).forEach(e -> temp.add(e, e));
             WikiPage webPage = new WikiPage(s);
             webPage.setTable(temp);
             webPage.date = d1;
@@ -254,7 +255,7 @@ public class Parser {
             String page = doc.text().toLowerCase();
             String[] arr = page.split("\\W+");
             Arrays.sort(arr);
-            Arrays.stream(arr).forEach(e -> temp.put(e, e));
+            Arrays.stream(arr).forEach(e -> temp.add(e, e));
             WikiPage webPage = new WikiPage(doc.attr("abs:href"));
             webPage.setTable(temp);
             return webPage;
@@ -342,7 +343,7 @@ public class Parser {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-mm-dd hh:mm");
             Date d1 = sdf.parse(parseDate);
             if (!d1.equals(date)) {
-                File[] files = new File("/Users/andrewboyce/IdeaProjects/csc365/src").listFiles();
+                File[] files = new File(System.getProperty("user.dir")).listFiles();
                 for (File file : files) if (file.getName().contains(".txt")) file.delete();
                 initialize();
             }

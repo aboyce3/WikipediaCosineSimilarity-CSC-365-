@@ -18,13 +18,13 @@ public class WikiPage {
         this.words = t;
     }
 
-    public Double cosineSimilarity(HashTable main, HashTable target){
+    public Double cosineSimilarity(HashTable main, HashTable target) {
         ArrayList<Integer> first = new ArrayList();
         ArrayList<Integer> second = new ArrayList();
         //If a word matches then add the occurrences to their respective list
-        for(HashNode n : main.table){
-            for(HashNode node = n; n != null; n = n.next){
-                if(target.get(node.key) != null) {
+        for (Object i : main.hashes){
+            for (HashNode node = main.table[(int)i]; node != null; node = node.next) {
+                if (target.get(node.key) != null) {
                     first.add(node.occurences);
                     second.add(target.get(node.key).occurences);
                 }
@@ -35,7 +35,7 @@ public class WikiPage {
         Double magMain = 0.0;//square the value in the set, add to itself, then get the square root after iteration
         Double magTarget = 0.0;//square the value in the set, add to itself, then get the square root after iteration
 
-        for (int i = 0; i < first.size()-1; i++){
+        for (int i = 0; i < first.size() - 1; i++) {
             dotProduct += first.get(i) * second.get(i);
             magMain += Math.pow(first.get(i), 2);
             magTarget += Math.pow(second.get(i), 2);

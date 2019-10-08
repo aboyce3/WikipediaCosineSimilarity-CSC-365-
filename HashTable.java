@@ -1,3 +1,4 @@
+import java.util.*;
 class HashNode<V> {
     String key;
     V value;
@@ -32,20 +33,23 @@ class HashNode<V> {
 public class HashTable<V> {
     public HashNode<V>[] table;
     public int count;
+    public HashSet<Integer> hashes;
 
     public HashTable(int i) {
         table = new HashNode[i];
         count = 0;
+        hashes = new HashSet<>();
     }
 
-    //puts elements in the hashtable
-    public void put(String k, V v) {
+    //adds elements in the hashtable
+    public void add(String k, V v) {
         int hash = k.hashCode() & (table.length - 1);
         if (count > ((2 * (table.length - 1)) / 3)) {
             resize();
         }
         if (table[hash] == null) {
             table[hash] = new HashNode(k, v);
+            hashes.add(hash);
             count++;
         } else if (table[hash].exists(k)) {
             HashNode t = this.get(k);
@@ -76,7 +80,7 @@ public class HashTable<V> {
 
     //here but not used other than for testing
     public void printInOrder() {
-        for (int i = 0; i < table.length; i++) {
+        for (Integer i : hashes) {
             for (HashNode n = table[i]; n != null; n = n.next) {
                 System.out.println(n.key + ":" + n.occurences + "\n");
             }
@@ -86,9 +90,9 @@ public class HashTable<V> {
     //resizes the hastable by 2x its length
     private void resize() {
         HashTable temp = new HashTable(table.length * 2);
-        for (int i = 0; i < table.length - 1; i++) {
+        for (Integer i : hashes) {
             for (HashNode n = table[i]; n != null; n = n.next) {
-                temp.put(n.key, n.value);
+                temp.add(n.key, n.value);
                 temp.get(n.key).occurences++;
             }
         }
