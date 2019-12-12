@@ -1,10 +1,11 @@
-import java.util.*;
-class HashNode<V> {
+import java.io.Serializable;
+import java.util.HashSet;
+
+class HashNode<V> implements Serializable {
     String key;
     V value;
     int occurences;
     HashNode next;
-
 
     public HashNode(String k, V v, HashNode next) {
         this.key = k;
@@ -27,11 +28,24 @@ class HashNode<V> {
         }
         return false;
     }
+
+    public int compareTo(HashNode<V> n) {
+        if (key == null && n.key == null) {
+            return 0;
+        }
+        if (key == null) {
+            return 1;
+        }
+        if (n == null) {
+            return -1;
+        }
+        return key.compareTo(n.key);
+    }
 }
 
 @SuppressWarnings("unchecked")
-public class HashTable<V> {
-    public HashNode<V>[] table;
+public class HashTable<V> implements Serializable {
+    public HashNode<String>[] table;
     public int count;
     public HashSet<Integer> hashes;
 
@@ -62,7 +76,7 @@ public class HashTable<V> {
     }
 
     //gets an element from the table and returns null if it doesn't exist
-    public HashNode<V> get(String k) {
+    public HashNode<String> get(String k) {
         int hash = k.hashCode() & (table.length - 1);
         if (table[hash] == null) return null;
         else if (table[hash].key.equals(k)) return table[hash];
@@ -78,11 +92,12 @@ public class HashTable<V> {
         return null;
     }
 
+
     //here but not used other than for testing
-    public void printInOrder() {
+    public void populateTree(BTree tree) {
         for (Integer i : hashes) {
             for (HashNode n = table[i]; n != null; n = n.next) {
-                System.out.println(n.key + ":" + n.occurences + "\n");
+                tree.add(n);
             }
         }
     }

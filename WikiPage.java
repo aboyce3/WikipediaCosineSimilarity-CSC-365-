@@ -1,17 +1,32 @@
-import java.util.ArrayList;
-import java.util.Date;
+import org.jsoup.nodes.Element;
 
-public class WikiPage {
+import java.io.Serializable;
+import java.util.ArrayList;
+
+public class WikiPage implements Serializable, Comparable<WikiPage>{
     String URL;
     HashTable words;
     Double cosine;
-    Date date;
+    BTree tree;
+    transient Element self;
+    boolean medioid;
+    ArrayList<Edge> edges;
+    private double distanceFromSource = Double.MAX_VALUE;
+    private boolean visited = false;
+    int flag = -1;
+
+    public WikiPage(String link, HashTable t) throws Exception {
+        this.URL = link;
+        this.words = t;
+        this.cosine = 0.0;
+        medioid = false;
+        tree = new BTree(link, words);
+        self = null;
+    }
 
     public WikiPage(String link) {
         this.URL = link;
-        this.words = new HashTable(128);
         this.cosine = 0.0;
-        date = null;
     }
 
     public void setTable(HashTable t) {
@@ -21,9 +36,10 @@ public class WikiPage {
     public Double cosineSimilarity(HashTable main, HashTable target) {
         ArrayList<Integer> first = new ArrayList();
         ArrayList<Integer> second = new ArrayList();
+
         //If a word matches then add the occurrences to their respective list
-        for (Object i : main.hashes){
-            for (HashNode node = main.table[(int)i]; node != null; node = node.next) {
+        for (Object i : main.hashes) {
+            for (HashNode node = main.table[(int) i]; node != null; node = node.next) {
                 if (target.get(node.key) != null) {
                     first.add(node.occurences);
                     second.add(target.get(node.key).occurences);
@@ -44,6 +60,18 @@ public class WikiPage {
         magTarget = Math.sqrt(magTarget);
 
         //Formula for returning the similarity
-        return (dotProduct) / (magMain * magTarget);
+        return this.cosine =(dotProduct) / (magMain * magTarget);
+    }
+
+    public boolean isVisited() {
+        return visited;
+    }
+    public void setVisited(boolean visited) {
+        this.visited = visited;
+    }
+
+    @Override
+    public int compareTo(WikiPage otherVertex) {
+        return Double.compare(this.distanceFromSource, otherVertex.distanceFromSource);
     }
 }

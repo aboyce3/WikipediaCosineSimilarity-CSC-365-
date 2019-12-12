@@ -1,251 +1,150 @@
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.io.File;
-import java.io.FileWriter;
-import java.text.SimpleDateFormat;
+import java.io.FileOutputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
+import java.util.*;
 
 
-public class Parser {
+public class Parser implements Serializable {
     String URL;
-    Document document;
-    Elements links;
-    int fileCount;
+    transient Document document;
+    transient Elements links;
     ArrayList<WikiPage> table;
+    HashMap<WikiPage, ArrayList<Edge>> edges;
+    int numberOfEdges = 0;
 
-    public Parser(String URL) {
-        this.URL = URL;
-        try {
+    public Parser(String s) throws Exception {
+        File f = new File(System.getProperty("user.dir") + "/ParserOnDisk.ser");
+        if (!f.exists()) {
+            edges = new HashMap<>();
+            table = new ArrayList();
+            this.URL = s;
             this.document = Jsoup.connect(URL).get();
-        } catch (Exception e) {
-            e.printStackTrace();
+            links = document.select("a[href]");
+            generateGraph();
+            writeParserToDisk();
         }
-        links = document.select("a[href]");
-        fileCount = new File(System.getProperty("user.dir")).list().length;
-        table = new ArrayList();
     }
 
-    //if there are 24 files (txt files and java code) then check if the websites are updated or create files based off
-    // of a wikipedia link
-    public void initialize() {
-        File[] f = new File(System.getProperty("user.dir")).listFiles();
-        if (fileCount >= 24) {
-            Arrays.stream(f)
-                    .filter(e -> e.getName().contains(".txt"))
-                    .forEach(e -> {
-                        try {
-                            update("https://en.wikipedia.org/wiki/" + e.getName().substring(0, e.getName().length() - 4), e);
-                        } catch (Exception ex) {
-                            ex.printStackTrace();
+    public void resetVisited(){
+        for(WikiPage p : table)
+            p.setVisited(false);
+    }
+
+    public boolean hasURL(Element e) {
+        for (WikiPage page : table)
+            if (page.URL.equals(e.attr("abs:href"))) return true;
+        return false;
+    }
+
+    public WikiPage page(Element e) {
+        for (WikiPage page : table) {
+            if (page.URL.equals(e.attr("abs:href"))) return page;
+        }
+        return null;
+    }
+
+    public boolean exists(WikiPage p, Element e){
+        for(int i = 0; i < edges.get(p).size(); i++){
+            if(edges.get(p).get(i).dest == page(e)){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void link() throws Exception {
+        for (WikiPage p : table) {
+            if (p.self != null) {
+                Document doc = Jsoup.connect(p.self.attr("abs:href")).get();
+                Elements elements = doc.select("a[href]");
+                elements.stream()
+                        .distinct()
+                        .forEach(e -> {
+                            if (hasURL(e) && !exists(p,e) && page(e) != p){
+                                edges.get(p).add(new Edge(p, page(e)));
+                            }
+                        });
+            }
+        }
+        for(WikiPage p : edges.keySet()) {
+            numberOfEdges += edges.get(p).size();
+            p.edges = edges.get(p);
+        }
+    }
+
+    public void generateGraph() throws Exception {
+        WikiPage page = parse(Jsoup.connect(this.URL), this.URL);
+        edges.put(page, new ArrayList<>());
+        this.links.stream()
+                .filter(e ->
+                        e.attr("abs:href").contains("en.wikipedia.org/wiki/") &&
+                                !e.attr("abs:href").contains("#") &&
+                                !e.attr("abs:href").substring(30).contains("/") &&
+                                !e.attr("abs:href").substring(30).contains(":") &&
+                                !e.attr("abs:href").contains("Main_Page") &&
+                                !e.attr("abs:href").contains("%") &&
+                                !hasURL(e) && e != null)
+                .limit(46)
+                .distinct()
+                .forEach(e -> {
+                            try {
+                                WikiPage p = parse(Jsoup.connect(e.attr("abs:href")), e.attr("abs:href"));
+                                p.self = e;
+                                edges.get(page).add(new Edge(page, p));
+                                edges.put(p, new ArrayList<>());
+                                helper(p, e);
+                            } catch (Exception exception) {
+                                exception.printStackTrace();
+                            }
                         }
-                    });
-        } else {
-            parse(Jsoup.connect(this.URL), this.URL);
-            this.links.stream()
-                    .filter(e -> e.attr("abs:href")
-                            .contains("en.wikipedia.org/wiki/") &&
-                            !e.attr("abs:href").contains("#") &&
-                            !e.attr("abs:href").substring(30).contains("/") &&
-                            !e.attr("abs:href").substring(30).contains(":") && !e.attr("abs:href")
-                            .contains(this.URL))
-                    .distinct()
-                    .limit(19)
-                    .forEach(e -> parse(Jsoup.connect(e.attr("abs:href")), e.attr("abs:href")));
-        }
+                );
+        link();
     }
 
-    //grabs the date and then checks if it's updated
-    public void update(String s, File f) {
-        try {
-            HashTable temp = new HashTable(8);
-            Document doc = Jsoup.parse(f, "UTF-8", s);
-            String page = doc.text().toLowerCase();
-            String[] arr = page.split("\\W+");
-            Arrays.sort(arr);
-            Arrays.stream(arr).forEach(e -> temp.add(e, e));
-            WikiPage webPage = new WikiPage(s);
-            webPage.setTable(temp);
-            String lastMod = doc.body().text().substring(doc.body().text().indexOf("This page was last edited on "), doc.body().text().indexOf("(UTC)."));
-            lastMod = lastMod.substring(29, lastMod.indexOf(",")) + lastMod.substring(lastMod.indexOf("at ") + 2);
-            String[] date = lastMod.split("\\s+");
-            switch (date[1]) {
-                case "January":
-                    date[1] = "01";
-                    break;
-                case "February":
-                    date[1] = "02";
-                    break;
-                case "March":
-                    date[1] = "03";
-                    break;
-                case "April":
-                    date[1] = "04";
-                    break;
-                case "May":
-                    date[1] = "05";
-                    break;
-                case "June":
-                    date[1] = "06";
-                    break;
-                case "July":
-                    date[1] = "07";
-                    break;
-                case "August":
-                    date[1] = "08";
-                    break;
-                case "September":
-                    date[1] = "09";
-                    break;
-                case "October":
-                    date[1] = "10";
-                    break;
-                case "November":
-                    date[1] = "11";
-                    break;
-                case "December":
-                    date[1] = "12";
-                    break;
-            }
-            switch (date[0]) {
-                case "1":
-                    date[0] = "01";
-                    break;
-                case "2":
-                    date[0] = "02";
-                    break;
-                case "3":
-                    date[0] = "03";
-                    break;
-                case "4":
-                    date[0] = "04";
-                    break;
-                case "5":
-                    date[0] = "05";
-                    break;
-                case "6":
-                    date[0] = "06";
-                    break;
-                case "7":
-                    date[0] = "07";
-                    break;
-                case "8":
-                    date[0] = "08";
-                    break;
-                case "9":
-                    date[0] = "09";
-                    break;
-            }
-            String parseDate = date[2] + "-" + date[1] + "-" + date[0] + " " + date[3];
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-mm-dd hh:mm");
-            Date d1 = sdf.parse(parseDate);
-            webPage.date = d1;
-            table.add(webPage);
-            checkUpdated(d1, s, f);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    public void helper(WikiPage source, Element element) throws Exception {
+        Document doc = Jsoup.connect(element.attr("abs:href")).get();
+        Elements elements = doc.select("a[href]");
+        elements.stream().filter(e ->
+                e.attr("abs:href").contains("en.wikipedia.org/wiki/") &&
+                        !e.attr("abs:href").contains("#") &&
+                        !e.attr("abs:href").substring(30).contains("/") &&
+                        !e.attr("abs:href").substring(30).contains(":") &&
+                        !e.attr("abs:href").contains("Main_Page") &&
+                        !e.attr("abs:href").contains("%") &&
+                        !hasURL(e) && e != null)
+                .distinct()
+                .limit(10)
+                .forEach(e -> {
+                            try {
+                                WikiPage p = parse(Jsoup.connect(e.attr("abs:href")), e.attr("abs:href"));
+                                edges.get(source).add(new Edge(source, p));
+                                edges.put(p, new ArrayList<>());
+                            } catch (Exception exception) {
+                                exception.printStackTrace();
+                            }
+                        }
+                );
     }
 
     //Parses the web page and adds to an ArrayList of web pages
-    private void parse(Connection website, String s) {
-        try {
-            String link = System.getProperty("user.dir") + s.substring(29) + ".txt";
-            File f = new File(link);
-            HashTable temp = new HashTable(8);
-            Document doc = Jsoup.parse(website.get().html());
-            String page = doc.text().toLowerCase();
-            String lastMod = doc.body().text().substring(doc.body().text().indexOf("This page was last edited on "), doc.body().text().indexOf("(UTC)."));
-            lastMod = lastMod.substring(29, lastMod.indexOf(",")) + lastMod.substring(lastMod.indexOf("at ") + 2);
-            String[] date = lastMod.split("\\s+");
-            switch (date[1]) {
-                case "January":
-                    date[1] = "01";
-                    break;
-                case "February":
-                    date[1] = "02";
-                    break;
-                case "March":
-                    date[1] = "03";
-                    break;
-                case "April":
-                    date[1] = "04";
-                    break;
-                case "May":
-                    date[1] = "05";
-                    break;
-                case "June":
-                    date[1] = "06";
-                    break;
-                case "July":
-                    date[1] = "07";
-                    break;
-                case "August":
-                    date[1] = "08";
-                    break;
-                case "September":
-                    date[1] = "09";
-                    break;
-                case "October":
-                    date[1] = "10";
-                    break;
-                case "November":
-                    date[1] = "11";
-                    break;
-                case "December":
-                    date[1] = "12";
-                    break;
-            }
-            switch (date[0]) {
-                case "1":
-                    date[0] = "01";
-                    break;
-                case "2":
-                    date[0] = "02";
-                    break;
-                case "3":
-                    date[0] = "03";
-                    break;
-                case "4":
-                    date[0] = "04";
-                    break;
-                case "5":
-                    date[0] = "05";
-                    break;
-                case "6":
-                    date[0] = "06";
-                    break;
-                case "7":
-                    date[0] = "07";
-                    break;
-                case "8":
-                    date[0] = "08";
-                    break;
-                case "9":
-                    date[0] = "09";
-                    break;
-            }
-            String parseDate = date[2] + "-" + date[1] + "-" + date[0] + " " + date[3];
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-mm-dd hh:mm");
-            Date d1 = sdf.parse(parseDate);
-            String[] arr = page.split("\\W+");
-            Arrays.sort(arr);
-            Arrays.stream(arr).forEach(e -> temp.add(e, e));
-            WikiPage webPage = new WikiPage(s);
-            webPage.setTable(temp);
-            webPage.date = d1;
-            f.createNewFile();
-            FileWriter writer = new FileWriter(link);
-            writer.write(Jsoup.connect(s).get().text());
-            writer.close();
-            table.add(webPage);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    private WikiPage parse(Connection website, String s) throws Exception {
+        HashTable temp = new HashTable(8);
+        Document doc = Jsoup.parse(website.get().html());
+        String page = doc.text().toLowerCase();
+        String[] arr = page.split("\\W+");
+        Arrays.sort(arr);
+        Arrays.stream(arr).filter(e -> !e.equals("the")).forEach(e -> temp.add(e, e));
+        WikiPage webPage = new WikiPage(s, temp);
+        table.add(webPage);
+        return webPage;
     }
 
     public WikiPage parseInput(Connection website) {
@@ -255,7 +154,7 @@ public class Parser {
             String page = doc.text().toLowerCase();
             String[] arr = page.split("\\W+");
             Arrays.sort(arr);
-            Arrays.stream(arr).forEach(e -> temp.add(e, e));
+            Arrays.stream(arr).filter(e -> !e.equals("the")).forEach(e -> temp.add(e, e));
             WikiPage webPage = new WikiPage(doc.attr("abs:href"));
             webPage.setTable(temp);
             return webPage;
@@ -265,91 +164,13 @@ public class Parser {
         return null;
     }
 
-    //checks the date for each web page and updates
-    public void checkUpdated(Date date, String URL, File f) {
-        try {
-            Document t = Jsoup.connect(URL).get();
-            String temp = t.body().text().substring(t.body().text().indexOf("This page was last edited on "), t.body().text().indexOf("(UTC)."));
-            temp = temp.substring(29, temp.indexOf(",")) + temp.substring(temp.indexOf("at ") + 2);
-            String[] arr = temp.split("\\s+");
-            switch (arr[1]) {
-                case "January":
-                    arr[1] = "01";
-                    break;
-                case "February":
-                    arr[1] = "02";
-                    break;
-                case "March":
-                    arr[1] = "03";
-                    break;
-                case "April":
-                    arr[1] = "04";
-                    break;
-                case "May":
-                    arr[1] = "05";
-                    break;
-                case "June":
-                    arr[1] = "06";
-                    break;
-                case "July":
-                    arr[1] = "07";
-                    break;
-                case "August":
-                    arr[1] = "08";
-                    break;
-                case "September":
-                    arr[1] = "09";
-                    break;
-                case "October":
-                    arr[1] = "10";
-                    break;
-                case "November":
-                    arr[1] = "11";
-                    break;
-                case "December":
-                    arr[1] = "12";
-                    break;
-            }
-            switch (arr[0]) {
-                case "1":
-                    arr[0] = "01";
-                    break;
-                case "2":
-                    arr[0] = "02";
-                    break;
-                case "3":
-                    arr[0] = "03";
-                    break;
-                case "4":
-                    arr[0] = "04";
-                    break;
-                case "5":
-                    arr[0] = "05";
-                    break;
-                case "6":
-                    arr[0] = "06";
-                    break;
-                case "7":
-                    arr[0] = "07";
-                    break;
-                case "8":
-                    arr[0] = "08";
-                    break;
-                case "9":
-                    arr[0] = "09";
-                    break;
-            }
-            String parseDate = arr[2] + "-" + arr[1] + "-" + arr[0] + " " + arr[3];
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-mm-dd hh:mm");
-            Date d1 = sdf.parse(parseDate);
-            if (!d1.equals(date)) {
-                File[] files = new File(System.getProperty("user.dir")).listFiles();
-                for (File file : files) if (file.getName().contains(".txt")) file.delete();
-                initialize();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    private void writeParserToDisk() throws Exception {
+        FileOutputStream f = new FileOutputStream(new File(System.getProperty("user.dir") + "/ParserOnDisk.ser"));
+        ObjectOutputStream o = new ObjectOutputStream(f);
+        o.writeObject(this);
+        o.close();
+        f.close();
     }
+
 }
 
